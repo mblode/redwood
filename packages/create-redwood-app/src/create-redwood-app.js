@@ -17,12 +17,14 @@ import tmp from 'tmp'
 import checkNodeVersion from 'check-node-version'
 import chalk from 'chalk'
 
+import { name, version } from '../package'
+
 const RELEASE_URL =
-  'https://api.github.com/repos/redwoodjs/create-redwood-app/releases'
+  'https://api.github.com/repos/redwoodjs/create-redwood-app/releases/latest'
 
 const latestReleaseZipFile = async () => {
   const response = await axios.get(RELEASE_URL)
-  return response.data[0].zipball_url
+  return response.data.zipball_url
 }
 
 const downloadFile = async (sourceUrl, targetFile) => {
@@ -38,7 +40,22 @@ const downloadFile = async (sourceUrl, targetFile) => {
   })
 }
 
-const targetDir = String(process.argv.slice(2)).replace(/,/g, '-')
+const [_arg1, _arg2, ...args] = process.argv
+
+const helpInfo = `Usage: ${name} <target-dir> [options]\n\n Available options\n\n --help, -h\n --version, -v`
+
+if (args[0].startsWith('-')) {
+  if (['-h', '--help'].includes(args[0])) {
+    console.log(helpInfo)
+  } else if (['-v', '--version'].includes(args[0])) {
+    console.log(version)
+  } else {
+    console.error(`Invalid option, use ${name} --help to know more`)
+  }
+  process.exit(0)
+}
+
+const targetDir = String(args).replace(/,/g, '-')
 if (!targetDir) {
   console.error('Please specify the project directory')
   console.log(
@@ -57,6 +74,12 @@ if (!targetDir) {
 }
 
 const newAppDir = path.resolve(process.cwd(), targetDir)
+const appDirExists = fs.existsSync(newAppDir)
+
+if (appDirExists && fs.readdirSync(newAppDir).length > 0) {
+  console.error(`'${newAppDir}' already exists and is not empty.`)
+  process.exit(1)
+}
 
 const createProjectTasks = ({ newAppDir }) => {
   const tmpDownloadPath = tmp.tmpNameSync({
@@ -66,11 +89,8 @@ const createProjectTasks = ({ newAppDir }) => {
 
   return [
     {
-      title: `Creating directory '${newAppDir}'`,
+      title: `${appDirExists ? 'Using' : 'Creating'} directory '${newAppDir}'`,
       task: () => {
-        if (fs.existsSync(newAppDir)) {
-          throw new Error(`'${newAppDir}' already exists.`)
-        }
         fs.mkdirSync(newAppDir, { recursive: true })
       },
     },
@@ -89,16 +109,16 @@ const createProjectTasks = ({ newAppDir }) => {
       title: 'Clean up',
       task: () => {
         try {
-          fs.unlinkSync(path.join(newAppDir, './README.md'))
+          fs.unlinkSync(path.join(newAppDir, 'README.md'))
           fs.renameSync(
-            path.join(newAppDir, './README_APP.md'),
-            path.join(newAppDir, './README.md')
+            path.join(newAppDir, 'README_APP.md'),
+            path.join(newAppDir, 'README.md')
           )
 
-          fs.unlinkSync(path.join(newAppDir, './.gitignore'))
+          fs.unlinkSync(path.join(newAppDir, '.gitignore'))
           fs.renameSync(
-            path.join(newAppDir, './.gitignore.app'),
-            path.join(newAppDir, './.gitignore')
+            path.join(newAppDir, '.gitignore.app'),
+            path.join(newAppDir, '.gitignore')
           )
         } catch (e) {
           throw new Error('Could not move project files')
@@ -131,7 +151,7 @@ const installNodeModulesTasks = ({ newAppDir }) => {
       },
     },
     {
-      title: 'Running `yarn install`... (Could take awhile)',
+      title: 'Running `yarn install`... (This could take a while)',
       task: () => {
         return execa('yarn install', {
           shell: true,
@@ -159,7 +179,9 @@ new Listr(
   .then(() => {
     // TODO: show helpful out for next steps.
     console.log()
-    console.log(`Thanks for trying out Redwood! We've created '${newAppDir}'`)
+    console.log(
+      `Thanks for trying out Redwood! We've created your app in '${newAppDir}'`
+    )
     console.log()
     console.log(
       'Inside that directory you can run `yarn rw dev` to start the development server.'

@@ -5,8 +5,6 @@
 // TODO: Determine what to do different during development, test, and production
 // TODO: Take a look at create-react-app. They've dropped a ton of knowledge.
 
-const { getPaths } = require('@redwoodjs/internal')
-
 const TARGETS_NODE = '12.16.1'
 // https://github.com/zloirock/core-js/blob/master/README.md#babelpreset-env
 // Warning! Recommended to specify used minor core-js version, like corejs: '3.6',
@@ -15,7 +13,7 @@ const TARGETS_NODE = '12.16.1'
 const CORE_JS_VERSION = '3.6'
 
 module.exports = () => ({
-  presets: ['@babel/preset-react', '@babel/typescript'],
+  presets: ['@babel/preset-react', '@babel/preset-typescript'],
   plugins: [
     ['@babel/plugin-proposal-class-properties', { loose: true }],
     'babel-plugin-macros',
@@ -59,7 +57,7 @@ module.exports = () => ({
           'babel-plugin-module-resolver',
           {
             alias: {
-              src: getPaths().api.src,
+              src: './src',
             },
           },
         ],
@@ -67,11 +65,6 @@ module.exports = () => ({
           'babel-plugin-auto-import',
           {
             declarations: [
-              {
-                // import { db } from '@redwoodjs/api/dist/dbInstance'
-                members: ['db'],
-                path: '@redwoodjs/api/dist/dbInstance',
-              },
               {
                 // import { context } from '@redwoodjs/api'
                 members: ['context'],
@@ -84,6 +77,7 @@ module.exports = () => ({
             ],
           },
         ],
+        [require('../dist/babel-plugin-redwood-import-dir')],
       ],
     },
     // ** WEB **
@@ -134,6 +128,17 @@ module.exports = () => ({
           },
         ],
       ],
+    },
+    // ** Files ending in `Cell` **
+    {
+      test: /.+Cell.(js|tsx)$/,
+      plugins: [require('../dist/babel-plugin-redwood-cell')],
+    },
+    // Automatically import files in `./web/src/pages/*` in to
+    // the `./web/src/Routes.[ts|jsx]` file.
+    {
+      test: ['./web/src/Routes.js', './web/src/Routes.tsx'],
+      plugins: [require('../dist/babel-plugin-redwood-routes-auto-loader')],
     },
   ],
 })

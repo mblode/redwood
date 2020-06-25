@@ -1,32 +1,86 @@
-import { useContext } from 'react'
+import { forwardRef, useContext, useEffect } from 'react'
+import PropTypes from 'prop-types'
 
-import { LocationContext, navigate } from './internal'
+import { navigate, matchPath, LocationContext } from './internal'
 
-const Link = ({ to, ...rest }) => (
+/**
+ * Returns true if the URL for the given "route" value matches the current URL.
+ * This is useful for components that need to know "active" state, e.g.
+ * <NavLink>.
+ */
+const useMatch = (route) => {
+  const location = useContext(LocationContext)
+  const matchInfo = matchPath(route, location.pathname)
+
+  return matchInfo
+}
+
+const Link = forwardRef(({ to, ...rest }, ref) => (
   <a
     href={to}
+    ref={ref}
     {...rest}
     onClick={(event) => {
+      if (
+        event.button !== 0 ||
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.shiftKey
+      ) {
+        return
+      }
+
       event.preventDefault()
       navigate(to)
     }}
   />
+))
+
+const NavLink = forwardRef(
+  ({ to, className, activeClassName, ...rest }, ref) => {
+    const matchInfo = useMatch(to)
+    const theClassName = [className, matchInfo.match && activeClassName]
+      .filter(Boolean)
+      .join(' ')
+
+    return (
+      <a
+        href={to}
+        ref={ref}
+        className={theClassName}
+        {...rest}
+        onClick={(event) => {
+          if (
+            event.button !== 0 ||
+            event.altKey ||
+            event.ctrlKey ||
+            event.metaKey ||
+            event.shiftKey
+          ) {
+            return
+          }
+
+          event.preventDefault()
+          navigate(to)
+        }}
+      />
+    )
+  }
 )
 
-const NavLink = ({ to, className, activeClassName, ...rest }) => {
-  const context = useContext(LocationContext)
-  const theClassName = to === context.pathname ? activeClassName : className
-  return (
-    <a
-      href={to}
-      className={theClassName}
-      {...rest}
-      onClick={(event) => {
-        event.preventDefault()
-        navigate(to)
-      }}
-    />
-  )
+/**
+ * A declarative way to redirect to a route name
+ */
+const Redirect = ({ to }) => {
+  useEffect(() => {
+    navigate(to)
+  }, [to])
+  return null
+}
+Redirect.propTypes = {
+  /** The name of the route to redirect to */
+  to: PropTypes.string.isRequired,
 }
 
-export { Link, NavLink }
+export { Link, NavLink, useMatch, Redirect }
